@@ -38,9 +38,13 @@ class Primary extends Scene {
             camera.checkCollisions = true;
             //camera.applyGravity = true;
 
-            if ( navigator.hasOwnProperty('xr')){
-                this.createScene_EnableXR()
-            }
+
+
+
+            //if ( navigator.hasOwnProperty('xr')){
+            this.createScene_EnableXR()
+            //}
+
 
         });
         

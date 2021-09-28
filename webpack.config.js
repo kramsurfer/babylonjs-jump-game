@@ -22,7 +22,7 @@ module.exports = {
         //host: '192.168.1.253',
         host: '192.168.1.239',
         port: 3000,
-        https: false
+        https: true
     },
 
     module: {
