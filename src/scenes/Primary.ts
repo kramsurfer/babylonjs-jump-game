@@ -27,7 +27,10 @@ class Primary extends Scene {
         let light1: HemisphericLight = new HemisphericLight("light1", new Vector3(1, 1, 0), this);
         let sphere: Mesh = MeshBuilder.CreateSphere("sphere", { diameter: 1 }, this);
 
-        SceneLoader.ImportMesh("", "assets/scenes/", "test.babylon",this,( meshes)=>{
+        SceneLoader.ImportMesh("", "assets/scenes/level_1/", "level_1.babylon",this,( meshes,p,s,a,atr,ag,al)=>{
+            for ( let l of al ){
+                l.setEnabled(false)
+            }
             for ( let mMat of meshes ){
                 if ( mMat.material ) {
                     console.log(mMat.material);
@@ -39,7 +42,7 @@ class Primary extends Scene {
                 if ( mMat.name === "playerStart"){
                     //camera.position = mMat.position;
                     //mMat.setEnabled( false );
-                    this._player = new Player( this )
+                    this._player = new Player( this, mMat.position )
                     this._player.createScene_EnableXR( this, sphere )
                 }
             }
@@ -49,9 +52,6 @@ class Primary extends Scene {
 
             camera.checkCollisions = true;
             //camera.applyGravity = true;
-
-
-
 
             //if ( navigator.hasOwnProperty('xr')){
 

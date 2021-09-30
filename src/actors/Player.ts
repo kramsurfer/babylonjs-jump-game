@@ -13,8 +13,11 @@ class Player {
     _jumpSpeed: Vector3 = new Vector3(0,0,-0.05);
     _controlVector : Vector3 = new Vector3( 1,1,1 );
     _powerCount :number = 100;
+    _startPosition;
 
-    constructor( scene ) {
+    constructor( scene, startPos ) {
+
+        this._startPosition = startPos;
 
         scene.registerBeforeRender(()=>{
             if ( this._inXR ) {
@@ -43,7 +46,7 @@ class Player {
                 }else{
                     if ( this._powerCount < 100){
                         this._powerCount += 5;
-                        if ( this._powerCount === 100 ){
+                        if ( this._powerCount > 90 ){
                             this._controlVector = new Vector3( 1,1,1 );
                         }
                     }
@@ -69,6 +72,7 @@ class Player {
                 switch (state) {
                     case WebXRState.IN_XR:
                         this._inXR = true;
+                        scene.activeCamera.inputs.camera.position = this._startPosition
                     case WebXRState.ENTERING_XR:
                     // xr is being initialized, enter XR request was made
                     case WebXRState.EXITING_XR:
