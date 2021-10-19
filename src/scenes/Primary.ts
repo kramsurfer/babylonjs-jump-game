@@ -57,7 +57,7 @@ class Primary extends Scene {
                 if ( mMat.name === "playerStart"){
                     //camera.position = mMat.position;
                     //mMat.setEnabled( false );
-                    this._player = new Player( this, mMat.position )
+                    this._player = new Player( this, mMat.position.clone() )
                     this._player.createScene_EnableXR( this, sphere )
                 }
             }

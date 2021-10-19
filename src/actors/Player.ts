@@ -4,15 +4,15 @@ class Player {
 
     _xrHelper : WebXRExperienceHelper;
     _triggerDown : boolean;
-    _triggerFirstDown : boolean;
+    _triggerFirstDown : boolean = true;
     _gripTriggerDown: boolean;
     _inXR:boolean;
     _character;
     _handedness:string = "right";
     _leftController;
     _rightController;
-    _jumpSpeed: Vector3 = new Vector3(0,0,-0.011);
-    _controlVector : Vector3 = new Vector3( 1,1,1 );
+
+    _controlVector : Vector3 = new Vector3( 0,0,-0.005 );
     _powerCount :number = 100;
     _startPosition;
     _velocityVector : Vector3 = new Vector3( 0,0,0);
@@ -31,13 +31,18 @@ class Player {
         this._bottomPin = MeshBuilder.CreateSphere("sphere", { diameter: 0.025 }, scene );
         this._bottomPin.isPickable = false;
 
-        this._playerSphere = MeshBuilder.CreateSphere("playerSphere", { diameter: 0.5 }, scene );
+        this._playerSphere = MeshBuilder.CreateSphere("playerSphere", { diameter: 0.005 }, scene );
         this._playerSphere.checkCollisions = true;
 
         scene.collisionsEnabled = true
 
         this._startPosition = startPos;
         let raycastFloorPos
+        let tellme = document.getElementById('tellme');
+
+        let predicate = function (mesh) {
+            return mesh.isPickable && mesh.isEnabled();
+        }
 
         scene.registerBeforeRender(()=>{
             /* delta calculation */
@@ -48,76 +53,76 @@ class Player {
             if ( this._inXR ) {
                 let cam = scene.activeCamera.inputs.camera;
 
-                if ( this._triggerDown ){
-                    if ( this._triggerFirstDown ){
-                        //this._playerSphere.position.addInPlace( new Vector3(0,0.4,0));
+                if (this._triggerDown) {
+
+                    if (this._triggerFirstDown) {
+                        //this._playerSphere.position.addInPlace( new Vector3(0,0.05,0));
+                        this._velocityVector = new Vector3(0, 0.1, 0);
                         this._triggerFirstDown = false;
                     }
+
                     this._powerCount -= 1;
-                    if ( this._powerCount < 0  ){
-                        this._controlVector = new Vector3( 0.75,0.70,0.75 );
+                    if (this._powerCount < 0) {
+                        this._controlVector = new Vector3(0,0,(-0.1 * delta) );
                     }
-                    this._velocityVector.addInPlace(this._rightController.getDirection( this._jumpSpeed ).multiply( this._controlVector) );
+                    let controlVect:Vector3 = this._rightController.getDirection(this._controlVector)
+                    controlVect.multiplyInPlace(new Vector3(0.4,1,0.4));
+                    this._velocityVector.addInPlace( controlVect );
                 }
 
+
+                /* gravity */
+                this._velocityVector.y -= 0.0045;
+                /* terminal drop speed -0.2 */
                 if ( this._velocityVector.y < -0.2 ) this._velocityVector.y = -0.2;
+                /* max up speed */
                 if ( this._velocityVector.y > 0.15 ) this._velocityVector.y = 0.15;
-
-
 
                 /* movement */
                 const spMove = new Vector3((this._velocityVector.x * delta),(this._velocityVector.y * delta),(this._velocityVector.z * delta)  );
 
-                //console.log( ">>", this._playerSphere );
-                //console.log(this._velocityVector);
-                let chkCol;
-                for (let i = 0; i < 30; i++) {
-                    chkCol = this._playerSphere.moveWithCollisions( spMove );
-                }
-
-                if ( this._velocityVector.x != 0 ){
-                    if ( this._velocityVector.y != 0 ){
-                        if ( this._velocityVector.z != 0 ){
-                            scene.activeCamera.inputs.camera.position = this._playerSphere.position;
-                        }
+                let chkLen = this._velocityVector.length();
+                tellme.innerText = chkLen.toString();
+                if ( chkLen > 0.05 ) {
+                    for (let i = 0; i < 10; i++) {
+                        this._playerSphere.moveWithCollisions(spMove);
+                    }
+                }else{
+                    if (chkLen > 0.005) {
+                       this._playerSphere.position.addInPlace( spMove.multiplyByFloats(10,10,10) );
                     }
                 }
 
-                //console.log( "chkCol",chkCol );
-                //cam.position.addInPlace( this._velocityVector )
 
-                //console.log(cam);
-                if ( this._triggerDown === false ) {
+                    scene.activeCamera.inputs.camera.position = this._playerSphere.position.clone();
+                //}
+
+
+
+                if ( this._velocityVector.y < 0 ) {
                     raycastFloorPos = new Vector3(this._playerSphere.position.x, this._playerSphere.position.y - 0.5, this._playerSphere.position.z);
 
                     let ray = new Ray(raycastFloorPos, Vector3.Up().scale(-1), 0.6);
-                    let predicate = function (mesh) {
-                        return mesh.isPickable && mesh.isEnabled();
-                    }
 
                     let pick = scene.pickWithRay(ray, predicate);
-                    if (pick.hit === false) {
-                        this._velocityVector.addInPlace(this._gravity)
-                        if (this._gripTriggerDown) {
-                            this._velocityVector.x = 0;
-                            this._velocityVector.z = 0;
-                        }
-                    } else {
+                    if (pick.hit === true) {
+                        this._velocityVector.x = ( this._velocityVector.x * 0.95);
+                        this._velocityVector.z = ( this._velocityVector.z * 0.95);
                         this._velocityVector.y = 0;
-                        this._velocityVector.multiplyInPlace(this._skid);
-                        console.log("skid");
                         if (this._powerCount < 100) {
                             this._powerCount += 5;
                             if (this._powerCount > 90) {
-                                this._controlVector = new Vector3(1, 1, 1);
+                                this._controlVector = new Vector3( 0,0,-0.8 * delta );
+                                this._triggerFirstDown = true;
                             }
                         }
                     }
                 }
+
                 if ( this._powerNode.material ){
                     (this._powerNode.material as StandardMaterial).emissiveColor.r = (this._powerNode.material as StandardMaterial).diffuseColor.r = ( this._powerCount/110.0 ) ;
                 }
-
+                //tellme.innerText = delta.toString();//this._velocityVector.y.toString();
 
 
                 //(this._playerSphere as Mesh).moveWithCollisions( this._velocityVector );
@@ -145,10 +150,10 @@ class Player {
                         this._inXR = true;
 
                     case WebXRState.ENTERING_XR:
-                        scene.activeCamera.inputs.camera.position = this._startPosition;
+
                         scene.gravity = new Vector3(0,0,0);
-                        //scene.activeCamera.parent = this._playerSphere;
-                        // (scene.activeCamera as WebXRCamera).checkCollisions = true;
+                        this._playerSphere.position = this._startPosition;
+                        (scene.activeCamera as WebXRCamera).checkCollisions = false
                         console.log('scene.activeCamera',scene.activeCamera)
 
                     // xr is being initialized, enter XR request was made
@@ -185,10 +190,12 @@ class Player {
                         if (triggerComponent.pressed) {
                             Box_Left_Trigger.scaling = new Vector3(1.2, 1.2, 1.2);
                             this._triggerDown = true;
-                            this._triggerFirstDown = true;
                         } else {
                             Box_Left_Trigger.scaling = new Vector3(1, 1, 1);
                             this._triggerDown = false;
+                            if (this._powerCount < 0) {
+                                this._powerCount = 0;
+                            }
                         }
                     });
 
@@ -197,6 +204,8 @@ class Player {
                         if (squeezeComponent.pressed) {
                             Box_Left_Trigger.scaling = new Vector3(1.2, 1.2, 1.2);
                             this._gripTriggerDown = true;
+                            this._velocityVector.x = 0;
+                            this._velocityVector.z = 0;
                         } else {
                             Box_Left_Trigger.scaling = new Vector3(1, 1, 1);
                             this._gripTriggerDown = false;

@@ -21,7 +21,7 @@ module.exports = {
         hot: true,
         //host: '192.168.1.253',
         host: '192.168.1.239',
-        port: 3000,
+        port: 8080,
         https: true
     },
 

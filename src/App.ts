@@ -17,6 +17,9 @@ class App {
         canvas.id = "gameCanvas";
         document.body.appendChild(canvas);
 
+        document.body.insertAdjacentHTML('beforeend','<div id="tellme" style="position:absolute;top:0; left:0;color:white;z-index: 10000;">TEST</div>')
+
+
         // initialize babylon scene and engine
         var engine = new Engine(canvas, true);
         var currentScene = new Primary( engine, canvas )
