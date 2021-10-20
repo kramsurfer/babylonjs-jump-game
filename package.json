@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@babylonjs/materials": "^4.2.0",
-    "babylonjs-materials": "^4.2.0"
+    "babylonjs-materials": "^4.2.0",
+    "gsap": "^3.8.0"
   }
 }

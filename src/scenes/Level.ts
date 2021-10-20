@@ -2,9 +2,10 @@ import {ArcRotateCamera, Color3, CubeTexture, HemisphericLight, Material, Mesh, 
 import {Player} from "../actors/Player";
 import "@babylonjs/inspector";
 import "@babylonjs/core/Debug/debugLayer"
+import {TriggerLandingPad} from "../actors/TriggerLandingPad";
 
 
-class Primary extends Scene {
+class Level extends Scene {
 
     _xrHelper : WebXRExperienceHelper;
     _triggerDown : boolean;
@@ -44,14 +45,22 @@ class Primary extends Scene {
             for ( let l of al ){
                 l.setEnabled(false)
             }
-            console.log('al',al)
-            console.log('aa', this.lights)
-            for ( let mMat of meshes ){
+
+            
+            let totMesh = meshes.length;
+            for ( let mIndex = (totMesh-1); mIndex>0; -- mIndex ){
+                let mMat = meshes[ mIndex ];
+                console.log( "mesh", mMat.name )
                 if ( mMat.material ) {
-                    console.log(mMat.material);
+                    //console.log(mMat.material);
                     //(mMat.material as StandardMaterial).emissiveTexture = (mMat.material as StandardMaterial).diffuseTexture;
                     mMat.checkCollisions = true;
                     mMat.isPickable = true;
+                }
+                if( mMat.name.includes("RGET")){
+                    //console.log("target")
+                    mMat.isPickable = true;
+                    TriggerLandingPad.CreateWithMesh( mMat.name, this, (mMat as Mesh) );
                 }
 
                 if ( mMat.name === "playerStart"){
@@ -110,4 +119,4 @@ class Primary extends Scene {
     }
 }
 
-export { Primary };
+export { Level };

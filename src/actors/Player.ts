@@ -31,7 +31,7 @@ class Player {
     _rightController;
 
     _controlVector : Vector3 = new Vector3( 0,0,-0.005 );
-    _powerCount :number = 100;
+    _powerCount :number = 1000;
     _startPosition;
     _velocityVector : Vector3 = new Vector3( 0,0,0);
     _gravity: Vector3 = new Vector3( 0,-0.009,0);
@@ -136,7 +136,7 @@ class Player {
                 const spMove = new Vector3((this._velocityVector.x * delta),(this._velocityVector.y * delta),(this._velocityVector.z * delta)  );
 
                 let chkLen = this._velocityVector.length();
-                tellme.innerText = chkLen.toString();
+               // tellme.innerText = chkLen.toString();
                 if ( chkLen > 0.05 ) {
                     for (let i = 0; i < 10; i++) {
                         this._playerSphere.moveWithCollisions(spMove);
@@ -170,6 +170,13 @@ class Player {
                                 this._triggerFirstDown = true;
                             }
                         }
+                        //tellme.innerText =pick.pickedMesh.name;
+                        if ( pick.pickedMesh.name.includes('TARGET') ){
+                            if ( pick.pickedMesh.parent.playerVisited === false ){
+                                pick.pickedMesh.parent.setTrue();
+                            }
+                        }
+
                     }
                 }
 
@@ -177,7 +184,7 @@ class Player {
                     (this._powerNode.material as StandardMaterial).emissiveColor.r = (this._powerNode.material as StandardMaterial).diffuseColor.r = ( this._powerCount/110.0 ) ;
 
                 }
-                //tellme.innerText = delta.toString();//this._velocityVector.y.toString();
+
 
                 //(this._playerSphere as Mesh).moveWithCollisions( this._velocityVector );
             }
