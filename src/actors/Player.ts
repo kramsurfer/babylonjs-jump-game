@@ -1,4 +1,22 @@
-import {Material, Mesh, MeshBuilder, Node, Ray, Scene, StandardMaterial, TransformNode, Vector3, WebXRAbstractMotionController, WebXRCamera, WebXRDefaultExperienceOptions, WebXRExperienceHelper, WebXRState} from "@babylonjs/core";
+import {
+    Color3,
+    Color4,
+    Material,
+    Mesh,
+    MeshBuilder,
+    Node,
+    ParticleSystem,
+    Ray,
+    Scene,
+    StandardMaterial, Texture,
+    TransformNode,
+    Vector3,
+    WebXRAbstractMotionController,
+    WebXRCamera,
+    WebXRDefaultExperienceOptions,
+    WebXRExperienceHelper,
+    WebXRState
+} from "@babylonjs/core";
 
 class Player {
 
@@ -19,17 +37,12 @@ class Player {
     _gravity: Vector3 = new Vector3( 0,-0.009,0);
     _skid: Vector3 = new Vector3( 0.2,0.2,0.2);
     _powerNode: Mesh;
-    _bottomPin: Mesh;
     _parked:Boolean;
-
+    _particleSystem:ParticleSystem
     _playerSphere:Mesh;
     _lastTimeStamp: number;
 
     constructor( scene, startPos ) {
-
-
-        this._bottomPin = MeshBuilder.CreateSphere("sphere", { diameter: 0.025 }, scene );
-        this._bottomPin.isPickable = false;
 
         this._playerSphere = MeshBuilder.CreateSphere("playerSphere", { diameter: 0.005 }, scene );
         this._playerSphere.checkCollisions = true;
@@ -43,6 +56,43 @@ class Player {
         let predicate = function (mesh) {
             return mesh.isPickable && mesh.isEnabled();
         }
+
+        // Create a particle system
+        this._particleSystem = new ParticleSystem("particles", 1000, scene);
+
+        //Texture of each particle
+        this._particleSystem.particleTexture = new Texture("assets/textures/flare.png", scene);
+
+        // Where the particles come from
+        this._particleSystem.emitter = Vector3.Zero(); // the starting location
+
+        // Colors of all particles
+        this._particleSystem.color1 = new Color4(1, 0.92, 0.7);
+        this._particleSystem.color2 = new Color4(1, 0.29, 0.2);
+        this._particleSystem.colorDead = new Color4(0, 0, 0.2, 0.0);
+
+        // Size of each particle (random between...
+        this._particleSystem.minSize = 0.01;
+        this._particleSystem.maxSize = 0.05;
+
+        // Life time of each particle (random between...
+        this._particleSystem.minLifeTime = 0.3;
+        this._particleSystem.maxLifeTime = 1.5;
+
+        // Emission rate
+        this._particleSystem.emitRate = 100;
+
+        /******* Emission Space ********/
+        this._particleSystem.createPointEmitter(new Vector3(0.075,  0.075, 0.8), new Vector3(-0.1, -0.1,0.5));
+
+        // Speed
+        this._particleSystem.minEmitPower = 1;
+        this._particleSystem.maxEmitPower = 3;
+        this._particleSystem.updateSpeed = 0.01;
+
+        // Start the particle system
+        this._particleSystem.start();
+
 
         scene.registerBeforeRender(()=>{
             /* delta calculation */
@@ -64,12 +114,16 @@ class Player {
                     this._powerCount -= 1;
                     if (this._powerCount < 0) {
                         this._controlVector = new Vector3(0,0,(-0.1 * delta) );
+                        this._particleSystem.emitRate =  0;
+                    }else{
+                        this._particleSystem.emitRate =  this._powerCount*10;
                     }
                     let controlVect:Vector3 = this._rightController.getDirection(this._controlVector)
                     controlVect.multiplyInPlace(new Vector3(0.4,1,0.4));
                     this._velocityVector.addInPlace( controlVect );
+                }else{
+                    this._particleSystem.emitRate = 0;
                 }
-
 
                 /* gravity */
                 this._velocityVector.y -= 0.0045;
@@ -121,12 +175,11 @@ class Player {
 
                 if ( this._powerNode.material ){
                     (this._powerNode.material as StandardMaterial).emissiveColor.r = (this._powerNode.material as StandardMaterial).diffuseColor.r = ( this._powerCount/110.0 ) ;
+
                 }
                 //tellme.innerText = delta.toString();//this._velocityVector.y.toString();
 
-
                 //(this._playerSphere as Mesh).moveWithCollisions( this._velocityVector );
-
             }
         },30);
 
@@ -135,6 +188,12 @@ class Player {
     async createScene_EnableXR( scene:Scene, Box_Left_Trigger ) {
         let t : WebXRDefaultExperienceOptions = new WebXRDefaultExperienceOptions();
         this._powerNode = Box_Left_Trigger;
+        let cone = MeshBuilder.CreateCylinder("cylinder", {height:0.15, diameterTop:0.05, diameterBottom: 0.01})
+        cone.rotate( new Vector3(1,0,0), 1.57)
+        cone.material = new StandardMaterial("cone", scene);
+        (cone.material as StandardMaterial).emissiveColor = new Color3( 0.25,0.25,0.25);
+
+        cone.setParent( this._powerNode );
 
         scene.createDefaultXRExperienceAsync( t ).then(respose => {
             this._xrHelper  = respose.baseExperience;
@@ -153,6 +212,7 @@ class Player {
 
                         scene.gravity = new Vector3(0,0,0);
                         this._playerSphere.position = this._startPosition;
+
                         (scene.activeCamera as WebXRCamera).checkCollisions = false
                         console.log('scene.activeCamera',scene.activeCamera)
 
@@ -175,10 +235,15 @@ class Player {
                             console.log( "controller",mc )
                             if (isLeft) {
                                 this._leftController = mc;
+                                (this._leftController.getChildren())[0].setEnabled(false)
                             }
                             else{
                                 this._rightController = mc;
                                 this._powerNode.parent = this._rightController;
+                                (this._rightController.getChildren())[0].setEnabled(false)
+                                this._rightController.opacity =0;
+                                this._particleSystem.emitter = this._powerNode;
+                                console.log('this._rightController',this._rightController);
                             }
                         });
                     }
@@ -238,8 +303,8 @@ class Player {
         // From fullscreenVR to 2D view
         /*
        this.actionManager.registerAction(
-            new BABYLON.ExecuteCodeAction({
-                    trigger: BABYLON.ActionManager.OnKeyDownTrigger,
+            new ExecuteCodeAction({
+                    trigger: ActionManager.OnKeyDownTrigger,
                     parameter: 'e' //press "e" key
                 },
                 function () {
@@ -249,7 +314,7 @@ class Player {
             ));
 
          */
-        //scene.actionManager = new BABYLON.ActionManager(scene);
+        //scene.actionManager = new ActionManager(scene);
 
 
     }
