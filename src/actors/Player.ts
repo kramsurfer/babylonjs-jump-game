@@ -7,7 +7,7 @@ import {
     Node,
     ParticleSystem,
     Ray,
-    Scene,
+    Scene, SceneLoader,
     StandardMaterial, Texture,
     TransformNode,
     Vector3,
@@ -21,24 +21,40 @@ import {
 class Player {
 
     _xrHelper : WebXRExperienceHelper;
-    _triggerDown : boolean;
-    _triggerFirstDown : boolean = true;
-    _gripTriggerDown: boolean;
-    _inXR:boolean;
-    _character;
-    _handedness:string = "right";
+    _thrustTriggerDownRight : boolean;
+    _thrustTriggerDownLeft : boolean;
+    
+    _powerCountRight :number = 100;
+    _powerCountLeft :number = 100;
+
+    _powerMeshRight: Mesh;
+    _powerMeshLeft: Mesh;
+    
     _leftController;
     _rightController;
 
+    _thrusterMeshRight:TransformNode;
+    _thrusterMeshLeft:TransformNode;
+
+    _particleSystemRight:ParticleSystem;
+    _particleSystemLeft:ParticleSystem;
+    
+    
+    _singleTriggerMode : boolean = true;
+    _triggerFirstDown : boolean = true;
+
+    _gripTriggerDown: boolean;
+    
+    _inXR:boolean;
+  
     _controlVector : Vector3 = new Vector3( 0,0,-0.005 );
-    _powerCount :number = 1000;
-    _startPosition;
     _velocityVector : Vector3 = new Vector3( 0,0,0);
+    
+    _startPosition;
     _gravity: Vector3 = new Vector3( 0,-0.009,0);
     _skid: Vector3 = new Vector3( 0.2,0.2,0.2);
-    _powerNode: Mesh;
-    _parked:Boolean;
-    _particleSystem:ParticleSystem
+
+
     _playerSphere:Mesh;
     _lastTimeStamp: number;
 
@@ -58,71 +74,99 @@ class Player {
         }
 
         // Create a particle system
-        this._particleSystem = new ParticleSystem("particles", 1000, scene);
+        this._particleSystemLeft =  this.createScene_rocketParticleSystem( scene, "leftThruster_particles" );
+        this._particleSystemRight =  this.createScene_rocketParticleSystem( scene, "RightThruster_particles" );
 
-        //Texture of each particle
-        this._particleSystem.particleTexture = new Texture("assets/textures/flare.png", scene);
 
-        // Where the particles come from
-        this._particleSystem.emitter = Vector3.Zero(); // the starting location
+        SceneLoader.ImportMesh("", "assets/Sword/", "sword.babylon",scene,( meshes,p,s,a,atr,ag,al)=>{
+            /* remove any lights */
+            for ( let l of al ){ l.dispose(); }
+            this._thrusterMeshRight = new TransformNode( scene );
+            this._thrusterMeshLeft = new TransformNode( scene );
 
-        // Colors of all particles
-        this._particleSystem.color1 = new Color4(1, 0.92, 0.7);
-        this._particleSystem.color2 = new Color4(1, 0.29, 0.2);
-        this._particleSystem.colorDead = new Color4(0, 0, 0.2, 0.0);
+            let totMesh = meshes.length;
+            for ( let mIndex = (totMesh-1); mIndex>-1; -- mIndex ) {
+                meshes[ mIndex ].setParent( this._thrusterMeshRight );
 
-        // Size of each particle (random between...
-        this._particleSystem.minSize = 0.01;
-        this._particleSystem.maxSize = 0.05;
+                let lefT = (meshes[ mIndex ] as Mesh).clone("Left_Thrust-" + meshes[ mIndex ].name )
+                lefT.setParent( this._thrusterMeshLeft );
+                
+                if ( meshes[ mIndex ].name === "Rocket_Status" ){
+                    this._powerMeshRight = ( meshes[mIndex] as Mesh )
+                    let sMat:StandardMaterial = new StandardMaterial("Right_Thrust-PowerMaterial", scene );
+                    sMat.diffuseColor = new Color3( 1, 0 ,0 );
+                    this._powerMeshRight.material = sMat;
 
-        // Life time of each particle (random between...
-        this._particleSystem.minLifeTime = 0.3;
-        this._particleSystem.maxLifeTime = 1.5;
+                    sMat = new StandardMaterial("Left_Thrust-PowerMaterial", scene );
+                    sMat.diffuseColor = new Color3( 1, 0 ,0 );
+                    this._powerMeshLeft = lefT;
+                    this._powerMeshLeft.material = sMat;
+                }
 
-        // Emission rate
-        this._particleSystem.emitRate = 100;
+                meshes[ mIndex ].name = "Right_Thrust-" + meshes[ mIndex ].name
+            }
 
-        /******* Emission Space ********/
-        this._particleSystem.createPointEmitter(new Vector3(0.075,  0.075, 0.8), new Vector3(-0.1, -0.1,0.5));
-
-        // Speed
-        this._particleSystem.minEmitPower = 1;
-        this._particleSystem.maxEmitPower = 3;
-        this._particleSystem.updateSpeed = 0.01;
-
-        // Start the particle system
-        this._particleSystem.start();
-
+            this._thrusterMeshRight.rotate( new Vector3(-1,0,0), 1.57 );
+            this._thrusterMeshLeft.rotate( new Vector3(-1,0,0), 1.57 );
+        });
 
         scene.registerBeforeRender(()=>{
             /* delta calculation */
             const now = performance.now()
             const delta = (now - this._lastTimeStamp)/1000
             this._lastTimeStamp = now
+            const zPowerPerFrame =  new Vector3(0, 0, (-0.9 * delta));
 
             if ( this._inXR ) {
                 let cam = scene.activeCamera.inputs.camera;
+                if ( this._thrustTriggerDownRight || this._thrustTriggerDownLeft ) {
 
-                if (this._triggerDown) {
+                    let controlVect:Vector3 = new Vector3(0,0,0);
 
-                    if (this._triggerFirstDown) {
+                    if ( this._triggerFirstDown ) {
                         //this._playerSphere.position.addInPlace( new Vector3(0,0.05,0));
                         this._velocityVector = new Vector3(0, 0.1, 0);
                         this._triggerFirstDown = false;
                     }
 
-                    this._powerCount -= 1;
-                    if (this._powerCount < 0) {
-                        this._controlVector = new Vector3(0,0,(-0.1 * delta) );
-                        this._particleSystem.emitRate =  0;
-                    }else{
-                        this._particleSystem.emitRate =  this._powerCount*10;
+                    this._controlVector = new Vector3(0, 0, 0);
+
+                    if ( this._thrustTriggerDownRight ) {
+                        this._powerCountRight -= 1;
+                        if (this._powerCountRight < 0) {
+                            this._particleSystemRight.emitRate = 0;
+                        } else {
+                            this._particleSystemRight.emitRate = this._powerCountRight * 10;
+                            controlVect.addInPlace( this._rightController.getDirection( zPowerPerFrame ));
+                        }
                     }
-                    let controlVect:Vector3 = this._rightController.getDirection(this._controlVector)
+
+                    if ( this._thrustTriggerDownLeft ) {
+                        this._powerCountLeft -= 1;
+                        if (this._powerCountLeft < 0) {
+                            this._particleSystemLeft.emitRate = 0;
+                        } else {
+                            this._particleSystemLeft.emitRate = this._powerCountLeft * 10;
+                            controlVect.addInPlace( this._leftController.getDirection( zPowerPerFrame ));
+                        }
+                    }
+
                     controlVect.multiplyInPlace(new Vector3(0.4,1,0.4));
                     this._velocityVector.addInPlace( controlVect );
+
+
+
                 }else{
-                    this._particleSystem.emitRate = 0;
+                    this._particleSystemRight.emitRate = 0;
+                    this._particleSystemLeft.emitRate = 0;
+                }
+
+                if ( this._powerMeshRight.material ){
+                    (this._powerMeshRight.material as StandardMaterial).emissiveColor.r = (this._powerMeshRight.material as StandardMaterial).diffuseColor.r = ( this._powerCountRight/110.0 ) ;
+                }
+
+                if ( this._powerMeshLeft.material ){
+                    (this._powerMeshLeft.material as StandardMaterial).emissiveColor.r = (this._powerMeshLeft.material as StandardMaterial).diffuseColor.r = ( this._powerCountLeft/110.0 ) ;
                 }
 
                 /* gravity */
@@ -163,9 +207,16 @@ class Player {
                         this._velocityVector.x = ( this._velocityVector.x * 0.95);
                         this._velocityVector.z = ( this._velocityVector.z * 0.95);
                         this._velocityVector.y = 0;
-                        if (this._powerCount < 100) {
-                            this._powerCount += 5;
-                            if (this._powerCount > 90) {
+                        if (this._powerCountRight < 100) {
+                            this._powerCountRight += 5;
+                            if (this._powerCountRight > 90) {
+                                this._controlVector = new Vector3( 0,0,-0.8 * delta );
+                                this._triggerFirstDown = true;
+                            }
+                        }
+                        if (this._powerCountLeft < 100) {
+                            this._powerCountLeft += 5;
+                            if (this._powerCountLeft > 90) {
                                 this._controlVector = new Vector3( 0,0,-0.8 * delta );
                                 this._triggerFirstDown = true;
                             }
@@ -180,10 +231,7 @@ class Player {
                     }
                 }
 
-                if ( this._powerNode.material ){
-                    (this._powerNode.material as StandardMaterial).emissiveColor.r = (this._powerNode.material as StandardMaterial).diffuseColor.r = ( this._powerCount/110.0 ) ;
 
-                }
 
 
                 //(this._playerSphere as Mesh).moveWithCollisions( this._velocityVector );
@@ -192,15 +240,53 @@ class Player {
 
     }
 
+    createScene_rocketParticleSystem ( scene, partName ): ParticleSystem {
+        let retParticleSys = new ParticleSystem(partName, 1000, scene);
+
+        //Texture of each particle
+        retParticleSys.particleTexture = new Texture("assets/textures/flare.png", scene);
+
+        // Where the particles come from
+        retParticleSys.emitter = Vector3.Zero(); // the starting location
+
+        // Colors of all particles
+        retParticleSys.color1 = new Color4(1, 0.92, 0.7);
+        retParticleSys.color2 = new Color4(1, 0.29, 0.2);
+        retParticleSys.colorDead = new Color4(0, 0, 0.2, 0.0);
+
+        // Size of each particle (random between...
+        retParticleSys.minSize = 0.01;
+        retParticleSys.maxSize = 0.05;
+
+        // Life time of each particle (random between...
+        retParticleSys.minLifeTime = 0.3;
+        retParticleSys.maxLifeTime = 1.5;
+
+        // Emission rate
+        retParticleSys.emitRate = 100;
+
+        /******* Emission Space ********/
+        retParticleSys.createPointEmitter(new Vector3(0.075,  0.075, 0.8), new Vector3(-0.1, -0.1,0.5));
+
+        // Speed
+        retParticleSys.minEmitPower = 1;
+        retParticleSys.maxEmitPower = 3;
+        retParticleSys.updateSpeed = 0.01;
+
+        // Start the particle system
+        retParticleSys.start();
+
+        return retParticleSys;
+    }
     async createScene_EnableXR( scene:Scene, Box_Left_Trigger ) {
         let t : WebXRDefaultExperienceOptions = new WebXRDefaultExperienceOptions();
-        this._powerNode = Box_Left_Trigger;
-        let cone = MeshBuilder.CreateCylinder("cylinder", {height:0.15, diameterTop:0.05, diameterBottom: 0.01})
-        cone.rotate( new Vector3(1,0,0), 1.57)
-        cone.material = new StandardMaterial("cone", scene);
-        (cone.material as StandardMaterial).emissiveColor = new Color3( 0.25,0.25,0.25);
-
-        cone.setParent( this._powerNode );
+        
+        let particleSystemRight = MeshBuilder.CreateSphere("emitterSphere", { diameter: 0.05, segments:3 }, scene );
+        particleSystemRight.translate( new Vector3(0,1,0), -0.07);
+        particleSystemRight.isVisible = false;
+        let particleSystemLeft = MeshBuilder.CreateSphere("emitterSphere", { diameter: 0.05, segments:3 }, scene );
+        particleSystemLeft.translate( new Vector3(0,1,0), -0.07);
+        particleSystemLeft.isVisible = false;
 
         scene.createDefaultXRExperienceAsync( t ).then(respose => {
             this._xrHelper  = respose.baseExperience;
@@ -234,56 +320,72 @@ class Player {
             respose.input.onControllerAddedObservable.add((controller) => {
 
                 controller.onMotionControllerInitObservable.add((motionController) => {
+                    /* assign mesh to handed controllers per hand */
+                    controller.onMeshLoadedObservable.add((mc) => {
 
-                    // hands are controllers to; do not want to go do this code; when it is a hand
-                    if ( motionController.handedness != "none") {
-                        const isLeft = motionController.handedness === 'left';
-                        controller.onMeshLoadedObservable.add((mc) => {
-                            console.log( "controller",mc )
-                            if (isLeft) {
-                                this._leftController = mc;
-                                (this._leftController.getChildren())[0].setEnabled(false)
-                            }
-                            else{
-                                this._rightController = mc;
-                                this._powerNode.parent = this._rightController;
-                                (this._rightController.getChildren())[0].setEnabled(false)
-                                this._rightController.opacity =0;
-                                this._particleSystem.emitter = this._powerNode;
-                                console.log('this._rightController',this._rightController);
+                        if ( motionController.handedness === 'left' ) {
+                            this._leftController = mc;
+                            this._thrusterMeshLeft.parent = this._leftController;
+                            (this._leftController.getChildren())[0].setEnabled(false)
+                            particleSystemLeft.parent = this._thrusterMeshLeft;
+                            this._particleSystemLeft.emitter = particleSystemLeft;
+                            console.log('this._leftController',this._leftController);
+                        }
+
+                        if ( motionController.handedness === 'right' ) {
+                            this._rightController = mc;
+                            this._thrusterMeshRight.parent = this._rightController;
+                            particleSystemRight.parent = this._thrusterMeshRight;
+                            (this._rightController.getChildren())[0].setEnabled(false)
+                            this._rightController.opacity =0;
+                            this._particleSystemRight.emitter = particleSystemRight;
+                            console.log('this._rightController',this._rightController);
+                        }
+
+                    });
+
+                    /* assign trigger event to handed controllers per hand */
+                    const xr_ids = motionController.getComponentIds();
+                    let triggerComponent = motionController.getComponent(xr_ids[0]);//xr-standard-trigger
+
+                    if ( motionController.handedness === 'left' ) {
+                        triggerComponent.onButtonStateChangedObservable.add(() => {
+                            if (triggerComponent.pressed) {
+                                this._thrustTriggerDownLeft = true;
+                            } else {
+                                this._thrustTriggerDownLeft = false;
+                                if (this._powerCountLeft < 0) {
+                                    this._powerCountLeft = 0;
+                                }
                             }
                         });
                     }
 
-                    const xr_ids = motionController.getComponentIds();
-
-                    let triggerComponent = motionController.getComponent(xr_ids[0]);//xr-standard-trigger
-                    triggerComponent.onButtonStateChangedObservable.add(() => {
-                        if (triggerComponent.pressed) {
-                            Box_Left_Trigger.scaling = new Vector3(1.2, 1.2, 1.2);
-                            this._triggerDown = true;
-                        } else {
-                            Box_Left_Trigger.scaling = new Vector3(1, 1, 1);
-                            this._triggerDown = false;
-                            if (this._powerCount < 0) {
-                                this._powerCount = 0;
+                    if ( motionController.handedness === 'right' ) {
+                        triggerComponent.onButtonStateChangedObservable.add(() => {
+                            if (triggerComponent.pressed) {
+                                this._thrustTriggerDownRight = true;
+                            } else {
+                                this._thrustTriggerDownRight = false;
+                                if (this._powerCountRight < 0) {
+                                    this._powerCountRight = 0;
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
 
                     let squeezeComponent = motionController.getComponent(xr_ids[1]);//xr-standard-squeeze
                     squeezeComponent.onButtonStateChangedObservable.add(() => {
                         if (squeezeComponent.pressed) {
-                            Box_Left_Trigger.scaling = new Vector3(1.2, 1.2, 1.2);
                             this._gripTriggerDown = true;
                             this._velocityVector.x = 0;
                             this._velocityVector.z = 0;
                         } else {
-                            Box_Left_Trigger.scaling = new Vector3(1, 1, 1);
                             this._gripTriggerDown = false;
                         }
                     });
 
+                    /*
                     let thumbstickComponent = motionController.getComponent(xr_ids[2]);//xr-standard-thumbstick
                     thumbstickComponent.onButtonStateChangedObservable.add(() => {
                         if (thumbstickComponent.pressed) {
@@ -291,16 +393,15 @@ class Player {
                         } else {
                             Box_Left_Trigger.scaling = new Vector3(1, 1, 1);
                         }
-                        /*
-                            let axes = thumbstickComponent.axes;
-                            Box_Left_ThumbStick.position.x += axes.x;
-                            Box_Left_ThumbStick.position.y += axes.y;
-                        */
-                    });
 
+                        let axes = thumbstickComponent.axes;
+                        Box_Left_ThumbStick.position.x += axes.x;
+                        Box_Left_ThumbStick.position.y += axes.y;
+                    });
                     thumbstickComponent.onAxisValueChangedObservable.add((axes) => {
                     });
-
+                    */
+                    
                 })
             });
         });
