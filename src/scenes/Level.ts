@@ -22,6 +22,7 @@ import "@babylonjs/inspector";
 import "@babylonjs/core/Debug/debugLayer"
 import {TriggerLandingPad} from "../actors/TriggerLandingPad";
 import {extractHighlightsPixelShader} from "@babylonjs/core/Shaders/extractHighlights.fragment";
+import {SphereEight} from "../geos/SphereEight";
 
 
 class Level extends Scene {
@@ -35,19 +36,19 @@ class Level extends Scene {
 
         super( engine );
 
-        let skybox = MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, this);
-        let skyboxMaterial:StandardMaterial = new StandardMaterial("skyBox", this);
-        skyboxMaterial.backFaceCulling = false;
+        //let skybox = MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, this);
+       // let skyboxMaterial:StandardMaterial = new StandardMaterial("skyBox", this);
+       // skyboxMaterial.backFaceCulling = false;
         //skyboxMaterial.reflectionTexture  = new CubeTexture("assets/scenes/TropicalSunnyDay", this);
         //skyboxMaterial.reflectionTexture.coordinatesMode  = Texture.SKYBOX_MODE;
-        skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
-        skyboxMaterial.specularColor = new Color3(0, 0, 0);
-        skybox.material = skyboxMaterial;
+        //skyboxMaterial.diffuseColor = new Color3(0, 0, 0);
+       // skyboxMaterial.specularColor = new Color3(0, 0, 0);
+        //skybox.material = skyboxMaterial;
 
-        this.fogColor = new Color3( 0,0,0)
-        this.fogEnd = 28;
-        this.fogStart = 2;
-        this.fogMode = 3;
+        //this.fogColor = new Color3( 0,0,0)
+        //this.fogEnd = 28;
+        //this.fogStart = 2;
+        //this.fogMode = 3;
 
         let camera: ArcRotateCamera = new ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 2, 2, Vector3.Zero(), this);
         camera.attachControl(canvas, true);
@@ -80,7 +81,7 @@ class Level extends Scene {
         mesh.material = new StandardMaterial("mat", this );
         mesh.alwaysSelectAsActiveMesh = true;
         (mesh.material as StandardMaterial).emissiveColor = Color3.White();
-
+        mesh.visibility = 0;
         this.registerBeforeRender(function () {
             mesh.rotation.y += 0.001;
         });
@@ -88,6 +89,9 @@ class Level extends Scene {
         //Update SPS mesh
         SPS.initParticles();
         SPS.setParticles();
+
+        let s8 = new SphereEight("test", this )
+        s8.applyTextureMaps("assets/scenes/Level_02_Out/star_8k")
 
         //var gl = new GlowLayer("glow", this);
 
@@ -117,8 +121,8 @@ class Level extends Scene {
                 if ( mMat.name === "playerStart"){
                     //camera.position = mMat.position;
                     mMat.setEnabled( false );
-                    this._player = new Player( this, mMat.position.clone() )
-                    this._player.createScene_EnableXR( this, sphere )
+                    this._player = new Player( this, mMat.position.clone(), s8 );
+                    this._player.createScene_EnableXR( this, sphere );
                 }
             }
 
@@ -127,8 +131,8 @@ class Level extends Scene {
             this.collisionsEnabled = true;
             camera.checkCollisions = true;
 
-            var light = new PointLight("pointLight", new Vector3(0, 100, 0), this);
-            light.intensity = 0.2
+            //var light = new PointLight("pointLight", new Vector3(0, 100, 0), this);
+            //light.intensity = 0.2
             //if ( navigator.hasOwnProperty('xr')){
 
             //}

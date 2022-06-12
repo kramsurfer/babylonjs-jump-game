@@ -38,8 +38,7 @@ class Player {
 
     _particleSystemRight:ParticleSystem;
     _particleSystemLeft:ParticleSystem;
-    
-    
+
     _singleTriggerMode : boolean = true;
     _triggerFirstDown : boolean = true;
 
@@ -54,14 +53,14 @@ class Player {
     _gravity: Vector3 = new Vector3( 0,-0.009,0);
     _skid: Vector3 = new Vector3( 0.2,0.2,0.2);
 
-
     _playerSphere:Mesh;
     _lastTimeStamp: number;
 
-    constructor( scene, startPos ) {
+    constructor( scene, startPos, worldObj ) {
 
         this._playerSphere = MeshBuilder.CreateSphere("playerSphere", { diameter: 0.005 }, scene );
         this._playerSphere.checkCollisions = true;
+        worldObj.setParent( this._playerSphere );
 
         scene.collisionsEnabled = true
 
@@ -115,9 +114,17 @@ class Player {
             const now = performance.now()
             const delta = (now - this._lastTimeStamp)/1000
             this._lastTimeStamp = now
-            const zPowerPerFrame =  new Vector3(0, 0, (-0.9 * delta));
+            const zPowerPerFrame =  new Vector3(0, 0, (-0.1 * delta));
 
             if ( this._inXR ) {
+
+                if ( this._playerSphere.position.y < -1 ){
+                    this._playerSphere.position = this._startPosition.clone();
+                    this._velocityVector = new Vector3(0,0,0);
+                }
+
+                document.getElementById("tellme").innerText = this._playerSphere.position.y.toString();
+
                 let cam = scene.activeCamera.inputs.camera;
                 if ( this._thrustTriggerDownRight || this._thrustTriggerDownLeft ) {
 
@@ -191,11 +198,7 @@ class Player {
                     }
                 }
 
-
-                    scene.activeCamera.inputs.camera.position = this._playerSphere.position.clone();
-                //}
-
-
+                scene.activeCamera.inputs.camera.position = this._playerSphere.position.clone();
 
                 if ( this._velocityVector.y < 0 ) {
                     raycastFloorPos = new Vector3(this._playerSphere.position.x, this._playerSphere.position.y - 0.5, this._playerSphere.position.z);
@@ -230,10 +233,6 @@ class Player {
 
                     }
                 }
-
-
-
-
                 //(this._playerSphere as Mesh).moveWithCollisions( this._velocityVector );
             }
         },30);
@@ -259,8 +258,8 @@ class Player {
         retParticleSys.maxSize = 0.05;
 
         // Life time of each particle (random between...
-        retParticleSys.minLifeTime = 0.3;
-        retParticleSys.maxLifeTime = 1.5;
+        retParticleSys.minLifeTime = 1;
+        retParticleSys.maxLifeTime = 2;
 
         // Emission rate
         retParticleSys.emitRate = 100;
@@ -269,8 +268,8 @@ class Player {
         retParticleSys.createPointEmitter(new Vector3(0.075,  0.075, 0.8), new Vector3(-0.1, -0.1,0.5));
 
         // Speed
-        retParticleSys.minEmitPower = 1;
-        retParticleSys.maxEmitPower = 3;
+        retParticleSys.minEmitPower = 0.5;
+        retParticleSys.maxEmitPower = 2;
         retParticleSys.updateSpeed = 0.01;
 
         // Start the particle system
@@ -278,14 +277,17 @@ class Player {
 
         return retParticleSys;
     }
+
     async createScene_EnableXR( scene:Scene, Box_Left_Trigger ) {
         let t : WebXRDefaultExperienceOptions = new WebXRDefaultExperienceOptions();
         
         let particleSystemRight = MeshBuilder.CreateSphere("emitterSphere", { diameter: 0.05, segments:3 }, scene );
         particleSystemRight.translate( new Vector3(0,1,0), -0.07);
+        particleSystemRight.rotate( new Vector3(1,0,0), 1.57 );
         particleSystemRight.isVisible = false;
         let particleSystemLeft = MeshBuilder.CreateSphere("emitterSphere", { diameter: 0.05, segments:3 }, scene );
         particleSystemLeft.translate( new Vector3(0,1,0), -0.07);
+        particleSystemLeft.rotate( new Vector3(1,0,0), 1.57 );
         particleSystemLeft.isVisible = false;
 
         scene.createDefaultXRExperienceAsync( t ).then(respose => {
@@ -304,9 +306,10 @@ class Player {
                     case WebXRState.ENTERING_XR:
 
                         scene.gravity = new Vector3(0,0,0);
-                        this._playerSphere.position = this._startPosition;
+                        this._playerSphere.position = this._startPosition.clone();
 
-                        (scene.activeCamera as WebXRCamera).checkCollisions = false
+                        (scene.activeCamera as WebXRCamera).checkCollisions = false;
+
                         console.log('scene.activeCamera',scene.activeCamera)
 
                     // xr is being initialized, enter XR request was made
